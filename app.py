@@ -5,6 +5,8 @@ import random
 import math
 import csv
 import io
+import threading
+import time
 from flask import Flask, render_template, jsonify, request, Response
 
 app = Flask(__name__, template_folder="templates", static_folder="static", static_url_path="/static")
@@ -625,6 +627,67 @@ def export_csv():
     )
 
 
+@app.route("/api/esp32-code/<int:dustbin_id>")
+def esp32_code(dustbin_id):
+    cpp_code = f"""// ESP32 Microcontroller + HC-SR04 Ultrasonic Distance Sensor Firmware
+// Target Dustbin Node ID: #{dustbin_id}
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+
+const char* ssid = "YOUR_WIFI_SSID";
+const char* password = "YOUR_WIFI_PASSWORD";
+const char* serverUrl = "http://YOUR_LOCAL_SERVER_IP:5000/api/update-dustbin";
+
+const int TRIG_PIN = 5;
+const int ECHO_PIN = 18;
+const int BIN_HEIGHT_CM = 100; // Empty bin height in cm
+const int BIN_ID = {dustbin_id};
+
+void setup() {{
+  Serial.begin(115200);
+  pinMode(TRIG_PIN, OUTPUT);
+  pinMode(ECHO_PIN, INPUT);
+
+  WiFi.begin(ssid, password);
+  while (WiFi.status() != WL_CONNECTED) {{
+    delay(500);
+    Serial.print(".");
+  }}
+  Serial.println("\\nWiFi Connected to Smart Waste Mesh!");
+}}
+
+void loop() {{
+  digitalWrite(TRIG_PIN, LOW);
+  delayMicroseconds(2);
+  digitalWrite(TRIG_PIN, HIGH);
+  delayMicroseconds(10);
+  digitalWrite(TRIG_PIN, LOW);
+
+  long duration = pulseIn(ECHO_PIN, HIGH);
+  float distance_cm = duration * 0.0343 / 2.0;
+  
+  float fill_cm = BIN_HEIGHT_CM - distance_cm;
+  int waste_level = map(constrain(fill_cm, 0, BIN_HEIGHT_CM), 0, BIN_HEIGHT_CM, 0, 100);
+
+  if (WiFi.status() == WL_CONNECTED) {{
+    HTTPClient http;
+    http.begin(serverUrl);
+    http.addHeader("Content-Type", "application/json");
+
+    String jsonPayload = "{{\\"id\\":" + String(BIN_ID) + ",\\"waste_level\\":" + String(waste_level) + "}}";
+    int httpResponseCode = http.POST(jsonPayload);
+    
+    Serial.printf("[Node #%d] Sent Waste Level: %d%% | HTTP Code: %d\\n", BIN_ID, waste_level, httpResponseCode);
+    http.end();
+  }}
+  
+  delay(15000); // 15-second telemetry interval
+}}
+"""
+    return Response(cpp_code, mimetype="text/plain")
+
+
 @app.route("/api/simulate", methods=["POST"])
 def simulate_telemetry():
     bins = get_waste_data()
@@ -633,7 +696,6 @@ def simulate_telemetry():
     cursor = connection.cursor()
 
     for bin_item in bins:
-        # Increase waste level or reset if full
         current = bin_item["waste_level"]
         if bin_item["collection_status"] == "Collected":
             new_level = random.randint(10, 35)
