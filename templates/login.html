@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login | EcoPulse Smart Waste Platform</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body class="auth-body">
+
+    <div class="auth-card">
+        <div class="brand auth-brand">
+            <div class="brand-icon">♻️</div>
+            <div class="brand-text">
+                <span class="brand-title">EcoPulse IoT</span>
+                <span class="brand-subtitle">Smart Urban Sanitation Portal</span>
+            </div>
+        </div>
+
+        <h2>Sign In to EcoPulse</h2>
+        <p class="auth-subtitle">Select your role or enter your credentials to access the platform.</p>
+
+        {% if error %}
+        <div class="alert full-alert" style="margin-bottom: 20px;">
+            ⚠️ {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/login">
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required placeholder="admin@smartwaste.com">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="••••••••">
+            </div>
+
+            <button type="submit" class="btn btn-primary-full margin-top-sm">
+                🔐 Sign In to Platform
+            </button>
+        </form>
+
+        <div class="demo-credentials-box">
+            <h4>⚡ Quick Demo Credentials</h4>
+            <div class="demo-btns">
+                <button type="button" class="btn-demo" onclick="fillDemo('admin@smartwaste.com', 'admin123')">
+                    👑 Operations Manager
+                </button>
+                <button type="button" class="btn-demo" onclick="fillDemo('driver@smartwaste.com', 'driver123')">
+                    🚚 Truck Driver
+                </button>
+                <button type="button" class="btn-demo" onclick="fillDemo('citizen@smartwaste.com', 'citizen123')">
+                    🏙️ Resident Citizen
+                </button>
+            </div>
+        </div>
+
+        <div class="auth-footer">
+            <span>Don't have an account?</span>
+            <a href="/register">Register New Account</a>
+        </div>
+    </div>
+
+    <script>
+        function fillDemo(email, pwd) {
+            document.getElementById('email').value = email;
+            document.getElementById('password').value = pwd;
+        }
+    </script>
+</body>
+
+</html>

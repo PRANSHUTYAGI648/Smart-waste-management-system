@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Citizen Sanitation Report | EcoPulse</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <div class="brand-icon">🏙️</div>
+                <div class="brand-text">
+                    <span class="brand-title">Citizen Incident Portal</span>
+                    <span class="brand-subtitle">Smart Urban Sanitation Reporting</span>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <a href="/dashboard" class="btn btn-outline-sm">📊 Operations Center</a>
+                <a href="/logout" class="btn btn-danger-sm">🚪 Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container" style="max-width: 900px;">
+
+        <div class="hero" style="padding: 20px 0;">
+            <div class="hero-badge">
+                <span>📢 Public Sanitation Incident Desk</span>
+            </div>
+            <h1>Report a Waste Issue in Your City</h1>
+            <p>Spotted an overflowing garbage bin, damaged lid, or illegal dumping? Report it instantly to dispatch clean-up crews.</p>
+        </div>
+
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2>📝 Submit Sanitation Incident Ticket</h2>
+            </div>
+
+            <form id="citizenReportForm" onsubmit="submitReport(event)">
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="repLocation">Target Bin Location</label>
+                        <select id="repLocation" required>
+                            <option value="">Select Monitored Bin Node...</option>
+                            {% for b in dustbins %}
+                            <option value="{{ b.location }}" data-id="{{ b.id }}">Bin #{{ b.id }} - {{ b.location }} ({{ b.bin_type }})</option>
+                            {% endfor %}
+                            <option value="Other / General Location">Other Location / Unmonitored Spot</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="repIssue">Issue Type</label>
+                        <select id="repIssue" required>
+                            <option value="Overflowing Waste Bin">🚨 Overflowing Waste Bin</option>
+                            <option value="Damaged Lid / Broken Sensor">🛠️ Damaged Lid / Broken Container</option>
+                            <option value="Foul Odor / Sanitation Hazard">😷 Foul Odor / Sanitation Hazard</option>
+                            <option value="Illegal Dumping Nearby">🚯 Illegal Dumping Nearby</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="repName">Your Name</label>
+                        <input type="text" id="repName" value="{{ user.name if user else '' }}" placeholder="Resident Name" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="repContact">Contact Email / Phone</label>
+                        <input type="text" id="repContact" value="{{ user.email if user else '' }}" placeholder="contact@domain.com">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="repDesc">Description & Details</label>
+                    <textarea id="repDesc" rows="3" class="form-textarea" placeholder="Describe the location or condition (e.g., bin lid is jammed open near canteen gate)..."></textarea>
+                </div>
+
+                <button type="submit" class="btn btn-primary-full">
+                    🚀 Dispatch Incident Report Ticket
+                </button>
+            </form>
+        </div>
+
+        <div class="card-panel margin-top">
+            <div class="panel-header">
+                <h2>📋 Recent Community Incident Tickets</h2>
+            </div>
+            <div id="reportsList" class="reports-list">
+                <div class="timeline-empty">Loading tickets...</div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="static/script.js"></script>
+    <script>
+        async function submitReport(e) {
+            e.preventDefault();
+            const location_name = document.getElementById("repLocation").value;
+            const issue_type = document.getElementById("repIssue").value;
+            const reporter_name = document.getElementById("repName").value;
+            const reporter_contact = document.getElementById("repContact").value;
+            const description = document.getElementById("repDesc").value;
+
+            try {
+                const res = await fetch("/api/citizen-report", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ location_name, issue_type, reporter_name, reporter_contact, description })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    alert("Ticket submitted successfully! Sanitation team has been notified.");
+                    document.getElementById("citizenReportForm").reset();
+                    loadReports();
+                }
+            } catch (err) {
+                console.error("Report Error:", err);
+            }
+        }
+
+        async function loadReports() {
+            try {
+                const res = await fetch("/api/citizen-reports");
+                const data = await res.json();
+                if (!data.success) return;
+
+                const container = document.getElementById("reportsList");
+                if (data.reports.length === 0) {
+                    container.innerHTML = `<div class="timeline-empty">No active incident reports.</div>`;
+                    return;
+                }
+
+                container.innerHTML = data.reports.map(r => {
+                    const isResolved = r.status === "Resolved";
+                    return `
+                        <div class="report-item ${isResolved ? 'resolved' : 'pending'}">
+                            <div class="report-header">
+                                <strong>${r.issue_type}</strong>
+                                <span class="report-status">${isResolved ? '✅ Resolved' : '⏳ Pending Crew Dispatch'}</span>
+                            </div>
+                            <div class="report-location">📍 ${r.location_name}</div>
+                            <p>${r.description || 'No additional details provided.'}</p>
+                            <div class="report-footer">
+                                <small>Reported by ${r.reporter_name} • ${r.created_at}</small>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            } catch (err) {
+                console.error("Load Reports Error:", err);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", loadReports);
+    </script>
+</body>
+
+</html>

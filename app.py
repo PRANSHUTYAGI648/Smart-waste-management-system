@@ -5,13 +5,15 @@ import random
 import math
 import csv
 import io
-import threading
 import time
-from flask import Flask, render_template, jsonify, request, Response
+from datetime import datetime, timedelta
+from flask import Flask, render_template, jsonify, request, Response, redirect, url_for, session
+from werkzeug.security import generate_password_hash, check_password_hash
 
 app = Flask(__name__, template_folder="templates", static_folder="static", static_url_path="/static")
+app.secret_key = "smart_waste_secret_key_super_secure_2026"
 
-# Database Configuration (MySQL with automatic SQLite Fallback)
+# Database Configuration (SQLite with MySQL Fallback)
 USE_MYSQL = False
 try:
     import mysql.connector
@@ -89,6 +91,18 @@ def init_sqlite_db():
     if "signal_rssi" not in columns:
         cursor.execute("ALTER TABLE dustbins ADD COLUMN signal_rssi INTEGER DEFAULT -65")
 
+    # Users & Auth Table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT UNIQUE NOT NULL,
+            password_hash TEXT NOT NULL,
+            role TEXT NOT NULL DEFAULT 'citizen',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     # Telemetry time-series log table
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS telemetry_logs (
@@ -110,9 +124,37 @@ def init_sqlite_db():
             collected_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     """)
+
+    # Citizen Incident Reports table
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS citizen_reports (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            dustbin_id INTEGER,
+            location_name TEXT NOT NULL,
+            issue_type TEXT NOT NULL,
+            description TEXT,
+            reporter_name TEXT NOT NULL,
+            reporter_contact TEXT,
+            status TEXT DEFAULT 'Pending',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+
     conn.commit()
 
-    # Seed data if empty
+    # Seed Default Users if empty
+    cursor.execute("SELECT COUNT(*) FROM users")
+    if cursor.fetchone()[0] == 0:
+        default_users = [
+            ("Admin Operations Manager", "admin@smartwaste.com", generate_password_hash("admin123"), "admin"),
+            ("Collection Driver Alex", "driver@smartwaste.com", generate_password_hash("driver123"), "driver"),
+            ("Resident Citizen Sam", "citizen@smartwaste.com", generate_password_hash("citizen123"), "citizen")
+        ]
+        for name, email, pwd, role in default_users:
+            cursor.execute("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)", (name, email, pwd, role))
+        conn.commit()
+
+    # Seed Dustbins Data if empty
     cursor.execute("SELECT COUNT(*) FROM dustbins")
     if cursor.fetchone()[0] == 0:
         json_path = os.path.join(os.path.dirname(__file__), "waste_data.json")
@@ -220,16 +262,145 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     return R * c
 
 
-# Routes
+# Authentication & Session Helpers
+def get_current_user():
+    user_id = session.get("user_id")
+    if not user_id:
+        return None
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    if USE_MYSQL:
+        cursor.execute("SELECT id, name, email, role FROM users WHERE id = %s", (user_id,))
+        user = cursor.fetchone()
+    else:
+        cursor.execute("SELECT id, name, email, role FROM users WHERE id = ?", (user_id,))
+        user = cursor.fetchone()
+    cursor.close()
+    connection.close()
+    return dict(user) if user else None
+
+
+# Multi-Portal Routes
 @app.route("/")
 def home():
-    return render_template("index.html")
+    user = get_current_user()
+    return render_template("index.html", user=user)
+
+
+@app.route("/login", methods=["GET", "POST"])
+def login():
+    if request.method == "POST":
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+
+        connection = get_db_connection()
+        cursor = connection.cursor()
+        if USE_MYSQL:
+            cursor.execute("SELECT * FROM users WHERE email = %s", (email,))
+            user = cursor.fetchone()
+        else:
+            cursor.execute("SELECT * FROM users WHERE email = ?", (email,))
+            row = cursor.fetchone()
+            user = dict(row) if row else None
+        cursor.close()
+        connection.close()
+
+        if user and check_password_hash(user["password_hash"], password):
+            session["user_id"] = user["id"]
+            session["user_name"] = user["name"]
+            session["user_role"] = user["role"]
+
+            if user["role"] == "admin":
+                return redirect(url_for("dashboard"))
+            elif user["role"] == "driver":
+                return redirect(url_for("driver_portal"))
+            else:
+                return redirect(url_for("citizen_report"))
+        else:
+            return render_template("login.html", error="Invalid email or password credentials.")
+
+    return render_template("login.html")
+
+
+@app.route("/register", methods=["GET", "POST"])
+def register():
+    if request.method == "POST":
+        name = request.form.get("name", "").strip()
+        email = request.form.get("email", "").strip().lower()
+        password = request.form.get("password", "")
+        role = request.form.get("role", "citizen")
+
+        if not name or not email or not password:
+            return render_template("register.html", error="All fields are required.")
+
+        pwd_hash = generate_password_hash(password)
+        connection = get_db_connection()
+        cursor = connection.cursor()
+
+        try:
+            if USE_MYSQL:
+                cursor.execute("INSERT INTO users (name, email, password_hash, role) VALUES (%s, %s, %s, %s)", (name, email, pwd_hash, role))
+                session["user_id"] = cursor.lastrowid
+            else:
+                cursor.execute("INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)", (name, email, pwd_hash, role))
+                session["user_id"] = cursor.lastrowid
+            connection.commit()
+            cursor.close()
+            connection.close()
+
+            session["user_name"] = name
+            session["user_role"] = role
+
+            if role == "admin":
+                return redirect(url_for("dashboard"))
+            elif role == "driver":
+                return redirect(url_for("driver_portal"))
+            else:
+                return redirect(url_for("citizen_report"))
+        except Exception as e:
+            cursor.close()
+            connection.close()
+            return render_template("register.html", error="An account with this email already exists.")
+
+    return render_template("register.html")
+
+
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect(url_for("login"))
 
 
 @app.route("/dashboard")
 def dashboard():
+    user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
     dustbins = get_waste_data()
-    return render_template("dashboard.html", dustbins=dustbins, depot=DEPOT)
+    return render_template("dashboard.html", dustbins=dustbins, depot=DEPOT, user=user)
+
+
+@app.route("/driver")
+def driver_portal():
+    user = get_current_user()
+    if not user:
+        return redirect(url_for("login"))
+    dustbins = get_waste_data()
+    return render_template("driver.html", dustbins=dustbins, depot=DEPOT, user=user)
+
+
+@app.route("/report")
+def citizen_report():
+    user = get_current_user()
+    dustbins = get_waste_data()
+    return render_template("report.html", dustbins=dustbins, user=user)
+
+
+@app.route("/simulator")
+def virtual_simulator():
+    user = get_current_user()
+    dustbins = get_waste_data()
+    return render_template("simulator.html", dustbins=dustbins, user=user)
 
 
 @app.route("/collect/<int:dustbin_id>", methods=["POST"])
@@ -237,7 +408,6 @@ def collect_dustbin(dustbin_id):
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # Get current waste level before reset
     if USE_MYSQL:
         cursor.execute("SELECT location, waste_level FROM dustbins WHERE id = %s", (dustbin_id,))
         row = cursor.fetchone()
@@ -248,7 +418,6 @@ def collect_dustbin(dustbin_id):
     waste_level_before = row["waste_level"] if row else 0
     location = row["location"] if row else f"Dustbin {dustbin_id}"
 
-    # Update dustbin status
     if USE_MYSQL:
         cursor.execute("""
             UPDATE dustbins
@@ -307,7 +476,6 @@ def api_dustbins():
 @app.route("/api/update-dustbin", methods=["POST"])
 def update_dustbin():
     data = request.get_json()
-
     if not data:
         return jsonify({"success": False, "message": "No data received"}), 400
 
@@ -445,7 +613,6 @@ def delete_dustbin(dustbin_id):
 @app.route("/api/route-optimization")
 def route_optimization():
     dustbins = get_waste_data()
-    # Filter bins needing collection (Warning or Full or fill level >= 50%)
     targets = [b for b in dustbins if b["waste_level"] >= 50 or b["collection_status"] == "Pending"]
 
     if not targets:
@@ -458,7 +625,6 @@ def route_optimization():
             "fuel_saved_liters": 0
         })
 
-    # Nearest Neighbor Algorithm starting from DEPOT
     unvisited = targets.copy()
     current_lat = DEPOT["latitude"]
     current_lon = DEPOT["longitude"]
@@ -485,11 +651,8 @@ def route_optimization():
             unvisited.remove(nearest_bin)
             stop_number += 1
 
-    # Return to Depot distance
     return_dist = haversine_distance(current_lat, current_lon, DEPOT["latitude"], DEPOT["longitude"])
     total_distance += return_dist
-
-    # Estimate time: 8 minutes per bin collection + 2 mins per km travel
     estimated_time = round((len(route) * 8) + (total_distance * 2), 1)
     fuel_saved = round((len(dustbins) - len(route)) * 0.45, 2)
 
@@ -504,12 +667,137 @@ def route_optimization():
     })
 
 
+# AI Predictive Fill Forecasting Engine
+@app.route("/api/predictions")
+def get_predictions():
+    dustbins = get_waste_data()
+    predictions = []
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    for bin_item in dustbins:
+        bin_id = bin_item["id"]
+        # Fetch last 5 telemetry logs
+        if USE_MYSQL:
+            cursor.execute("SELECT waste_level, recorded_at FROM telemetry_logs WHERE dustbin_id = %s ORDER BY id DESC LIMIT 5", (bin_id,))
+            logs = cursor.fetchall()
+        else:
+            cursor.execute("SELECT waste_level, recorded_at FROM telemetry_logs WHERE dustbin_id = ? ORDER BY id DESC LIMIT 5", (bin_id,))
+            logs = [dict(r) for r in cursor.fetchall()]
+
+        current_level = bin_item["waste_level"]
+
+        if current_level >= 100:
+            est_hours = 0.0
+            pred_text = "OVERFLOWING NOW"
+        elif len(logs) < 2:
+            fill_rate_per_hour = 3.5  # Default estimated slope %/hr
+            remaining_pct = 100 - current_level
+            est_hours = round(remaining_pct / fill_rate_per_hour, 1)
+            pred_text = f"~{est_hours} hours to overflow"
+        else:
+            # Linear trend calculation
+            recent = logs[0]["waste_level"]
+            oldest = logs[-1]["waste_level"]
+            delta = max(1, recent - oldest)
+            est_rate_per_hr = max(2.0, delta * 1.5)
+            remaining_pct = 100 - current_level
+            est_hours = round(remaining_pct / est_rate_per_hr, 1)
+            pred_text = f"~{est_hours} hours remaining"
+
+        overflow_timestamp = (datetime.now() + timedelta(hours=est_hours)).strftime("%H:%M PM (%b %d)")
+
+        predictions.append({
+            "dustbin_id": bin_id,
+            "location": bin_item["location"],
+            "current_fill": current_level,
+            "estimated_hours_to_full": est_hours,
+            "predicted_overflow_time": overflow_timestamp,
+            "prediction_text": pred_text
+        })
+
+    cursor.close()
+    connection.close()
+
+    return jsonify({"success": True, "predictions": predictions})
+
+
+# Citizen Incident Reporting Endpoints
+@app.route("/api/citizen-report", methods=["POST"])
+def submit_citizen_report():
+    data = request.get_json()
+    if not data or not data.get("location_name") or not data.get("issue_type"):
+        return jsonify({"success": False, "message": "Location and issue type are required"}), 400
+
+    dustbin_id = data.get("dustbin_id")
+    location_name = data.get("location_name").strip()
+    issue_type = data.get("issue_type")
+    description = data.get("description", "")
+    reporter_name = data.get("reporter_name", "Anonymous Citizen")
+    reporter_contact = data.get("reporter_contact", "")
+
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    if USE_MYSQL:
+        cursor.execute("""
+            INSERT INTO citizen_reports (dustbin_id, location_name, issue_type, description, reporter_name, reporter_contact)
+            VALUES (%s, %s, %s, %s, %s, %s)
+        """, (dustbin_id, location_name, issue_type, description, reporter_name, reporter_contact))
+    else:
+        cursor.execute("""
+            INSERT INTO citizen_reports (dustbin_id, location_name, issue_type, description, reporter_name, reporter_contact)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (dustbin_id, location_name, issue_type, description, reporter_name, reporter_contact))
+
+    connection.commit()
+    report_id = cursor.lastrowid
+    cursor.close()
+    connection.close()
+
+    return jsonify({"success": True, "message": "Thank you! Incident ticket reported successfully.", "report_id": report_id})
+
+
+@app.route("/api/citizen-reports")
+def get_citizen_reports():
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    if USE_MYSQL:
+        cursor.execute("SELECT * FROM citizen_reports ORDER BY id DESC LIMIT 30")
+        reports = cursor.fetchall()
+    else:
+        cursor.execute("SELECT * FROM citizen_reports ORDER BY id DESC LIMIT 30")
+        reports = [dict(r) for r in cursor.fetchall()]
+
+    cursor.close()
+    connection.close()
+
+    return jsonify({"success": True, "reports": reports})
+
+
+@app.route("/api/citizen-report/resolve/<int:report_id>", methods=["POST"])
+def resolve_citizen_report(report_id):
+    connection = get_db_connection()
+    cursor = connection.cursor()
+
+    if USE_MYSQL:
+        cursor.execute("UPDATE citizen_reports SET status = 'Resolved' WHERE id = %s", (report_id,))
+    else:
+        cursor.execute("UPDATE citizen_reports SET status = 'Resolved' WHERE id = ?", (report_id,))
+
+    connection.commit()
+    cursor.close()
+    connection.close()
+
+    return jsonify({"success": True, "message": f"Incident report #{report_id} marked as resolved."})
+
+
 @app.route("/api/analytics")
 def api_analytics():
     connection = get_db_connection()
     cursor = connection.cursor()
 
-    # Get recent 30 telemetry logs for time series
     if USE_MYSQL:
         cursor.execute("""
             SELECT t.dustbin_id, d.location, t.waste_level, t.recorded_at
@@ -552,7 +840,7 @@ def api_analytics():
         "current_volume_liters": round(current_volume, 1),
         "total_collections_made": col_count,
         "bin_type_distribution": type_counts,
-        "recent_telemetry_logs": logs[::-1]  # Return chronological
+        "recent_telemetry_logs": logs[::-1]
     })
 
 
@@ -627,67 +915,6 @@ def export_csv():
     )
 
 
-@app.route("/api/esp32-code/<int:dustbin_id>")
-def esp32_code(dustbin_id):
-    cpp_code = f"""// ESP32 Microcontroller + HC-SR04 Ultrasonic Distance Sensor Firmware
-// Target Dustbin Node ID: #{dustbin_id}
-
-#include <WiFi.h>
-#include <HTTPClient.h>
-
-const char* ssid = "YOUR_WIFI_SSID";
-const char* password = "YOUR_WIFI_PASSWORD";
-const char* serverUrl = "http://YOUR_LOCAL_SERVER_IP:5000/api/update-dustbin";
-
-const int TRIG_PIN = 5;
-const int ECHO_PIN = 18;
-const int BIN_HEIGHT_CM = 100; // Empty bin height in cm
-const int BIN_ID = {dustbin_id};
-
-void setup() {{
-  Serial.begin(115200);
-  pinMode(TRIG_PIN, OUTPUT);
-  pinMode(ECHO_PIN, INPUT);
-
-  WiFi.begin(ssid, password);
-  while (WiFi.status() != WL_CONNECTED) {{
-    delay(500);
-    Serial.print(".");
-  }}
-  Serial.println("\\nWiFi Connected to Smart Waste Mesh!");
-}}
-
-void loop() {{
-  digitalWrite(TRIG_PIN, LOW);
-  delayMicroseconds(2);
-  digitalWrite(TRIG_PIN, HIGH);
-  delayMicroseconds(10);
-  digitalWrite(TRIG_PIN, LOW);
-
-  long duration = pulseIn(ECHO_PIN, HIGH);
-  float distance_cm = duration * 0.0343 / 2.0;
-  
-  float fill_cm = BIN_HEIGHT_CM - distance_cm;
-  int waste_level = map(constrain(fill_cm, 0, BIN_HEIGHT_CM), 0, BIN_HEIGHT_CM, 0, 100);
-
-  if (WiFi.status() == WL_CONNECTED) {{
-    HTTPClient http;
-    http.begin(serverUrl);
-    http.addHeader("Content-Type", "application/json");
-
-    String jsonPayload = "{{\\"id\\":" + String(BIN_ID) + ",\\"waste_level\\":" + String(waste_level) + "}}";
-    int httpResponseCode = http.POST(jsonPayload);
-    
-    Serial.printf("[Node #%d] Sent Waste Level: %d%% | HTTP Code: %d\\n", BIN_ID, waste_level, httpResponseCode);
-    http.end();
-  }}
-  
-  delay(15000); // 15-second telemetry interval
-}}
-"""
-    return Response(cpp_code, mimetype="text/plain")
-
-
 @app.route("/api/simulate", methods=["POST"])
 def simulate_telemetry():
     bins = get_waste_data()
@@ -750,7 +977,7 @@ def simulate_telemetry():
 
     return jsonify({
         "success": True,
-        "message": "Simulated new IoT ultrasonic sensor readings",
+        "message": "Simulated new IoT sensor readings",
         "dustbins": updated
     })
 

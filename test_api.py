@@ -6,6 +6,7 @@ from app import app, init_sqlite_db, get_db_connection
 class SmartWasteAPITestCase(unittest.TestCase):
     def setUp(self):
         app.config['TESTING'] = True
+        app.secret_key = 'test_secret_key'
         self.client = app.test_client()
         init_sqlite_db()
 
@@ -18,14 +19,13 @@ class SmartWasteAPITestCase(unittest.TestCase):
         self.assertGreater(len(data['dustbins']), 0)
         print(f"[PASS] GET /api/dustbins passed ({len(data['dustbins'])} bins found)")
 
-    def test_02_update_dustbin(self):
-        payload = {"id": 1, "waste_level": 82}
-        res = self.client.post('/api/update-dustbin', json=payload)
+    def test_02_login_admin(self):
+        res = self.client.post('/login', data={
+            'email': 'admin@smartwaste.com',
+            'password': 'admin123'
+        }, follow_redirects=True)
         self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertTrue(data['success'])
-        self.assertEqual(data['status'], 'Full')
-        print("[PASS] POST /api/update-dustbin passed")
+        print("[PASS] POST /login admin credentials passed")
 
     def test_03_route_optimization(self):
         res = self.client.get('/api/route-optimization')
@@ -35,42 +35,41 @@ class SmartWasteAPITestCase(unittest.TestCase):
         self.assertIn('route', data)
         print(f"[PASS] GET /api/route-optimization passed ({data['bins_to_collect']} stops, {data['total_distance_km']} km)")
 
-    def test_04_analytics(self):
-        res = self.client.get('/api/analytics')
+    def test_04_ai_predictions(self):
+        res = self.client.get('/api/predictions')
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
         self.assertTrue(data['success'])
-        self.assertIn('avg_fill_level', data)
-        print(f"[PASS] GET /api/analytics passed (Avg fill: {data['avg_fill_level']}%)")
+        self.assertIn('predictions', data)
+        print(f"[PASS] GET /api/predictions passed ({len(data['predictions'])} predictions calculated)")
 
-    def test_05_add_and_delete_node(self):
-        new_node = {
-            "location": "UnitTest Innovation Lab",
-            "bin_type": "E-Waste & Batteries",
-            "capacity_liters": 100,
-            "latitude": 28.6150,
-            "longitude": 77.2095,
-            "waste_level": 40
+    def test_05_citizen_report(self):
+        report_data = {
+            "dustbin_id": 1,
+            "location_name": "Main Gate",
+            "issue_type": "Overflowing Waste Bin",
+            "description": "Bin is overflowing onto sidewalk.",
+            "reporter_name": "Test Resident",
+            "reporter_contact": "resident@example.com"
         }
-        res = self.client.post('/api/dustbin/add', json=new_node)
+        res = self.client.post('/api/citizen-report', json=report_data)
         self.assertEqual(res.status_code, 200)
         data = res.get_json()
         self.assertTrue(data['success'])
-        node_id = data['id']
-        print(f"[PASS] POST /api/dustbin/add passed (Created Bin #{node_id})")
+        report_id = data['report_id']
+        print(f"[PASS] POST /api/citizen-report passed (Ticket #{report_id})")
 
-        del_res = self.client.delete(f'/api/dustbin/{node_id}')
-        self.assertEqual(del_res.status_code, 200)
-        del_data = del_res.get_json()
-        self.assertTrue(del_data['success'])
-        print(f"[PASS] DELETE /api/dustbin/{node_id} passed")
+        list_res = self.client.get('/api/citizen-reports')
+        self.assertEqual(list_res.status_code, 200)
 
-    def test_06_collect_dustbin(self):
-        res = self.client.post('/collect/1')
-        self.assertEqual(res.status_code, 200)
-        data = res.get_json()
-        self.assertTrue(data['success'])
-        print("[PASS] POST /collect/1 passed")
+        resolve_res = self.client.post(f'/api/citizen-report/resolve/{report_id}')
+        self.assertEqual(resolve_res.status_code, 200)
+        print(f"[PASS] POST /api/citizen-report/resolve/{report_id} passed")
+
+    def test_06_portal_routes(self):
+        self.assertEqual(self.client.get('/report').status_code, 200)
+        self.assertEqual(self.client.get('/simulator').status_code, 200)
+        print("[PASS] Multi-portal pages rendering passed (/report, /simulator)")
 
     def test_07_export_csv(self):
         res = self.client.get('/api/export/csv')

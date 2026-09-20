@@ -107,13 +107,11 @@ function renderOverviewMetrics() {
     const normalEl = document.getElementById("normalCount");
     const warningEl = document.getElementById("warningCount");
     const fullEl = document.getElementById("fullCount");
-    const avgFillEl = document.getElementById("avgFillLevel");
 
     if (totalEl) totalEl.textContent = dustbinData.length;
     if (normalEl) normalEl.textContent = normalCount;
     if (warningEl) warningEl.textContent = warningCount;
     if (fullEl) fullEl.textContent = fullCount;
-    if (avgFillEl) avgFillEl.textContent = dustbinData.length ? Math.round(totalFill / dustbinData.length) + "%" : "0%";
 
     if (fullCount > 0) {
         playOverflowAlertSound();
@@ -149,7 +147,7 @@ function renderAlertsAndBars() {
                 `;
             }
         });
-        alertsContainer.innerHTML = alertHtml || `<div class="alert warning-alert" style="background: rgba(16, 185, 129, 0.1); border-color: rgba(16, 185, 129, 0.3); color: #34d399;">✅ All bin nodes are currently operating within safe capacity limits.</div>`;
+        alertsContainer.innerHTML = alertHtml || `<div class="alert warning-alert" style="background: rgba(0, 255, 157, 0.1); border-color: rgba(0, 255, 157, 0.3); color: #00ff9d;">✅ All bin nodes are currently operating within safe capacity limits.</div>`;
     }
 
     if (chartRowsContainer) {
@@ -205,7 +203,7 @@ function renderDustbinGrid() {
         const isPending = bin.collection_status === "Pending";
         const collectBtn = isPending
             ? `<button class="btn btn-primary-sm" onclick="collectDustbin(${bin.id})">🚮 Mark Cleaned</button>`
-            : `<span style="color: #34d399; font-weight: 600; font-size: 0.875rem;">✅ Cleaned</span>`;
+            : `<span style="color: #00ff9d; font-weight: 700; font-size: 0.875rem;">✅ Cleaned</span>`;
 
         return `
             <div class="dustbin-card">
@@ -266,11 +264,11 @@ function updateGISMap() {
     mapMarkers.forEach(m => leafletMap.removeLayer(m));
     mapMarkers = [];
 
-    // Depot Marker
+    // Depot Marker (Neon Cyan)
     const depotIcon = L.divIcon({
         className: 'custom-depot-marker',
-        html: `<div style="background: #3b82f6; width: 16px; height: 16px; border-radius: 50%; border: 3px solid white; box-shadow: 0 0 12px #3b82f6;"></div>`,
-        iconSize: [20, 20]
+        html: `<div style="background: #00e5ff; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #030712; box-shadow: 0 0 16px #00e5ff;"></div>`,
+        iconSize: [22, 22]
     });
 
     const depotMarker = L.marker([depotData.latitude, depotData.longitude], { icon: depotIcon })
@@ -278,16 +276,16 @@ function updateGISMap() {
         .bindPopup(`<strong>🏭 ${depotData.name}</strong><br>Central Fleet Dispatch Hub`);
     mapMarkers.push(depotMarker);
 
-    // Bin Markers
+    // Bin Markers (Neon Green, Yellow, Crimson)
     dustbinData.forEach(bin => {
-        let color = "#34d399";
-        if (bin.status === "Warning") color = "#fbbf24";
-        if (bin.status === "Full") color = "#f87171";
+        let color = "#00ff9d";
+        if (bin.status === "Warning") color = "#ffbe0b";
+        if (bin.status === "Full") color = "#ff0055";
 
         const icon = L.divIcon({
             className: 'custom-bin-marker',
-            html: `<div style="background: ${color}; width: 18px; height: 18px; border-radius: 50%; border: 3px solid #0f172a; box-shadow: 0 0 10px ${color}; display: flex; align-items: center; justify-content: center; font-size: 9px; font-weight: 800; color: #000;">${bin.id}</div>`,
-            iconSize: [22, 22]
+            html: `<div style="background: ${color}; width: 22px; height: 22px; border-radius: 50%; border: 3px solid #030712; box-shadow: 0 0 14px ${color}; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 800; color: #000;">${bin.id}</div>`,
+            iconSize: [26, 26]
         });
 
         const marker = L.marker([bin.latitude, bin.longitude], { icon: icon })
@@ -298,7 +296,7 @@ function updateGISMap() {
                     <span style="color: ${color}; font-weight: bold;">Fill Level: ${bin.waste_level}% (${bin.status})</span><br>
                     <small>Category: ${bin.bin_type || 'General'}</small><br>
                     <small>Battery: 🔋 ${bin.battery_level}% | Signal: ${bin.signal_rssi || -65}dBm</small><br>
-                    <button style="margin-top: 8px; background: #10b981; color: white; border: none; padding: 5px 10px; border-radius: 4px; cursor: pointer;" onclick="collectDustbin(${bin.id})">Mark Collected</button>
+                    <button style="margin-top: 8px; background: #00ff9d; color: #030712; border: none; padding: 6px 12px; border-radius: 6px; font-weight: bold; cursor: pointer;" onclick="collectDustbin(${bin.id})">Mark Collected</button>
                 </div>
             `);
         mapMarkers.push(marker);
@@ -337,7 +335,7 @@ async function loadRouteOptimization() {
             ];
 
             routePolyline = L.polyline(latlngs, {
-                color: '#3b82f6',
+                color: '#00e5ff',
                 weight: 4,
                 dashArray: '8, 8',
                 lineCap: 'round'
@@ -347,7 +345,7 @@ async function loadRouteOptimization() {
         // Render timeline sidebar
         if (timelineContainer) {
             if (data.route.length === 0) {
-                timelineContainer.innerHTML = `<div class="timeline-empty" style="color: #34d399; font-weight: 500;">✅ All bins are operating within safe capacity limits. No pickup dispatch needed!</div>`;
+                timelineContainer.innerHTML = `<div class="timeline-empty" style="color: #00ff9d; font-weight: 600;">✅ All bins operating within safe capacity limits. No pickup dispatch needed!</div>`;
             } else {
                 let html = `
                     <div class="timeline-item depot-stop">
@@ -411,18 +409,19 @@ async function loadAnalyticsData() {
                     datasets: [{
                         label: 'Waste Level Fill %',
                         data: dataset,
-                        borderColor: '#10b981',
-                        backgroundColor: 'rgba(16, 185, 129, 0.15)',
+                        borderColor: '#00ff9d',
+                        backgroundColor: 'rgba(0, 255, 157, 0.12)',
                         fill: true,
-                        tension: 0.4
+                        tension: 0.4,
+                        borderWidth: 3
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     scales: {
-                        y: { min: 0, max: 100, grid: { color: 'rgba(255, 255, 255, 0.08)' } },
-                        x: { grid: { color: 'rgba(255, 255, 255, 0.08)' } }
+                        y: { min: 0, max: 100, grid: { color: 'rgba(255, 255, 255, 0.06)' } },
+                        x: { grid: { color: 'rgba(255, 255, 255, 0.06)' } }
                     },
                     plugins: { legend: { display: false } }
                 }
@@ -443,14 +442,16 @@ async function loadAnalyticsData() {
                     labels: types,
                     datasets: [{
                         data: counts,
-                        backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#8b5cf6', '#ef4444']
+                        backgroundColor: ['#00ff9d', '#00e5ff', '#ffbe0b', '#a855f7', '#ff0055'],
+                        borderWidth: 2,
+                        borderColor: '#030712'
                     }]
                 },
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        legend: { position: 'bottom', labels: { color: '#f8fafc', font: { size: 11 } } }
+                        legend: { position: 'bottom', labels: { color: '#f8fafc', font: { size: 11, family: 'Plus Jakarta Sans' } } }
                     }
                 }
             });
@@ -512,7 +513,7 @@ function toggleAutoStream() {
         clearInterval(autoStreamInterval);
         autoStreamInterval = null;
         if (btn) {
-            btn.innerText = "▶ Auto Stream";
+            btn.innerText = "▶ Stream";
             btn.classList.remove("btn-primary-sm");
             btn.classList.add("btn-outline-sm");
         }

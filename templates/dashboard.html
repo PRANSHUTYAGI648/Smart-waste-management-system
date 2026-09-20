@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>EcoPulse | Smart Waste Management & GIS Dispatch</title>
+    <title>EcoPulse | Operations Control Center</title>
     
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -27,35 +27,33 @@
                 <div class="brand-icon">♻️</div>
                 <div class="brand-text">
                     <span class="brand-title">EcoPulse IoT</span>
-                    <span class="brand-subtitle">Smart Urban Waste Dispatch</span>
+                    <span class="brand-subtitle">Operations Control Center • {{ user.name if user else 'Manager' }}</span>
                 </div>
             </div>
 
             <div class="nav-tabs">
                 <button class="nav-tab active" onclick="switchTab('overview')">📊 Overview</button>
                 <button class="nav-tab" onclick="switchTab('gis-map')">🗺️ GIS Map & Route</button>
-                <button class="nav-tab" onclick="switchTab('analytics')">📈 Time-Series</button>
+                <button class="nav-tab" onclick="switchTab('analytics')">📈 Analytics & AI</button>
+                <button class="nav-tab" onclick="switchTab('inbox')">📥 Citizen Inbox</button>
                 <button class="nav-tab" onclick="switchTab('nodes')">🗑️ Bin Nodes</button>
             </div>
 
             <div class="nav-actions">
+                <a href="/driver" class="btn btn-outline-sm" title="Open Driver Mobile View">🚚 Driver View</a>
+                <a href="/report" class="btn btn-outline-sm" title="Citizen Reporting Desk">🏙️ Public Desk</a>
+                <a href="/simulator" class="btn btn-outline-sm" title="IoT Telemetry Emulator">🔬 IoT Simulator</a>
                 <button id="soundToggleBtn" onclick="toggleSoundAlerts()" class="btn-icon" title="Toggle Alert Sounds">
                     🔔 <span id="soundStatus">On</span>
                 </button>
                 <button id="autoStreamBtn" onclick="toggleAutoStream()" class="btn btn-outline-sm">
-                    ▶ Auto Stream
-                </button>
-                <button id="simBtn" onclick="triggerSimulation()" class="btn btn-secondary-sm">
-                    ⚡ Pulse Telemetry
+                    ▶ Stream
                 </button>
                 <button onclick="openAddNodeModal()" class="btn btn-primary-sm">
                     ➕ Add Node
                 </button>
-                <a href="/api/export/csv" class="btn btn-outline-sm" title="Export CSV Report">
-                    📥 CSV Report
-                </a>
-                <a href="/" class="btn btn-outline-sm">
-                    🏠 Home
+                <a href="/logout" class="btn btn-danger-sm" title="Logout">
+                    🚪 Logout
                 </a>
             </div>
         </div>
@@ -67,10 +65,10 @@
         <div class="status-ticker-bar">
             <div class="live-badge">
                 <span class="live-dot"></span>
-                <span>System Status: Operational • telemetry active</span>
+                <span>Role: {{ user.role | upper if user else 'ADMIN' }} • System Operational</span>
             </div>
             <div class="ticker-text" id="liveTicker">
-                📡 Connecting to IoT Ultrasonic Sensor Mesh...
+                📡 Connected to Ultrasonic Telemetry Mesh • AI Fill Forecasting Engine Online
             </div>
             <div id="lastUpdatedTime" class="last-updated">
                 Updated: Just now
@@ -83,7 +81,7 @@
                 <div class="metric-card card-total">
                     <div class="metric-icon">🗑️</div>
                     <div class="metric-info">
-                        <h3>Total Bins Monitored</h3>
+                        <h3>Monitored Nodes</h3>
                         <p id="totalDustbins">{{ dustbins|length }}</p>
                     </div>
                 </div>
@@ -115,16 +113,16 @@
                 <div class="metric-card card-route">
                     <div class="metric-icon">🚚</div>
                     <div class="metric-info">
-                        <h3>Dispatch Route Distance</h3>
+                        <h3>Route Distance</h3>
                         <p id="routeDistance">0.0 km</p>
                     </div>
                 </div>
 
                 <div class="metric-card card-capacity">
-                    <div class="metric-icon">⚖️</div>
+                    <div class="metric-icon">🤖</div>
                     <div class="metric-info">
-                        <h3>Average Fill Capacity</h3>
-                        <p id="avgFillLevel">0%</p>
+                        <h3>AI Predicted Overflows</h3>
+                        <p id="aiOverflowCount">0 Bins</p>
                     </div>
                 </div>
             </div>
@@ -154,6 +152,17 @@
                 {% endfor %}
             </div>
 
+            <!-- AI Fill Forecasting Panel -->
+            <div class="card-panel margin-top">
+                <div class="panel-header">
+                    <h2>🤖 AI Predictive Overflow Forecasting Engine</h2>
+                    <span class="text-muted">Machine Learning Linear Slope Model</span>
+                </div>
+                <div id="aiPredictionsGrid" class="dustbin-grid">
+                    <div class="timeline-empty">Calculating ML predictive fill slope...</div>
+                </div>
+            </div>
+
             <!-- Real-Time Capacity Visualizer Bar Chart -->
             <div class="card-panel margin-top">
                 <div class="panel-header">
@@ -170,7 +179,7 @@
                         <div class="chart-label">
                             <span class="bin-title">
                                 <strong>#{{ dustbin.id }}</strong> {{ dustbin.location }}
-                                <span class="bin-type-badge type-{{ dustbin.bin_type | lower | replace(' ', '-') }}">{{ dustbin.bin_type }}</span>
+                                <span class="bin-type-badge">{{ dustbin.bin_type }}</span>
                             </span>
                             <span class="percentage" id="percentage{{ dustbin.id }}">{{ dustbin.waste_level }}%</span>
                         </div>
@@ -195,7 +204,7 @@
                             <span class="badge-dot green"></span> Normal (≤50%)
                             <span class="badge-dot yellow"></span> Warning (51-80%)
                             <span class="badge-dot red"></span> Full (>80%)
-                            <span class="badge-dot blue"></span> Central Depot
+                            <span class="badge-dot blue"></span> Central Hub
                         </div>
                     </div>
                     <div id="map" class="map-container"></div>
@@ -203,7 +212,7 @@
 
                 <div class="gis-dispatch-card">
                     <div class="panel-header">
-                        <h2>🚚 Driver Dispatch & Optimized Pickup Sequence</h2>
+                        <h2>🚚 Driver Dispatch & Pickup Route</h2>
                     </div>
 
                     <div class="route-summary-box">
@@ -238,12 +247,12 @@
             </div>
         </section>
 
-        <!-- Time-Series Analytics Section -->
+        <!-- Time-Series Analytics & AI Section -->
         <section id="tab-analytics" class="tab-content">
             <div class="analytics-grid">
                 <div class="card-panel">
                     <div class="panel-header">
-                        <h2>📈 Time-Series Telemetry Trends</h2>
+                        <h2>📈 Time-Series Telemetry Stream</h2>
                         <span class="text-muted">Live 30-reading stream</span>
                     </div>
                     <div class="chart-wrapper">
@@ -254,11 +263,24 @@
                 <div class="card-panel">
                     <div class="panel-header">
                         <h2>♻️ Bin Category Distribution</h2>
-                        <span class="text-muted">Waste streams active</span>
+                        <span class="text-muted">Active Waste Streams</span>
                     </div>
                     <div class="chart-wrapper doughnut-wrapper">
                         <canvas id="binTypeDistributionChart"></canvas>
                     </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Citizen Inbox Tab -->
+        <section id="tab-inbox" class="tab-content">
+            <div class="card-panel">
+                <div class="panel-header">
+                    <h2>📥 Citizen Incident Tickets Inbox</h2>
+                    <span class="text-muted">Public Incident Stream</span>
+                </div>
+                <div id="inboxList" class="reports-list">
+                    <div class="timeline-empty">Loading citizen tickets...</div>
                 </div>
             </div>
         </section>
@@ -268,7 +290,7 @@
             <div class="filter-bar">
                 <div class="search-box">
                     <span class="search-icon">🔍</span>
-                    <input type="text" id="searchInput" oninput="filterDustbins()" placeholder="Search by location name or bin ID...">
+                    <input type="text" id="searchInput" oninput="filterDustbins()" placeholder="Search location name or ID...">
                 </div>
 
                 <div class="filter-group">
@@ -352,12 +374,100 @@
         </div>
     </div>
 
-    <!-- External Scripts: Leaflet.js Maps & Chart.js -->
+    <!-- External Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
-    <!-- Application Logic -->
     <script src="static/script.js"></script>
+    <script>
+        // AI Predictions and Citizen Inbox rendering
+        async function loadAIPredictions() {
+            try {
+                const res = await fetch("/api/predictions");
+                const data = await res.json();
+                if (!data.success) return;
+
+                const grid = document.getElementById("aiPredictionsGrid");
+                const overflowCountEl = document.getElementById("aiOverflowCount");
+                let overflowingBins = 0;
+
+                if (grid) {
+                    grid.innerHTML = data.predictions.map(p => {
+                        if (p.current_fill >= 80) overflowingBins++;
+                        const isDanger = p.current_fill >= 80;
+                        return `
+                            <div class="dustbin-card" style="border-left: 4px solid ${isDanger ? '#ef4444' : '#3b82f6'};">
+                                <div class="card-top">
+                                    <h3>Dustbin #${p.dustbin_id} - ${p.location}</h3>
+                                    <span class="bin-type-badge">${p.current_fill}% Full</span>
+                                </div>
+                                <div class="card-row">
+                                    <span>Predicted Overflow:</span>
+                                    <strong style="color: ${isDanger ? '#f87171' : '#60a5fa'};">${p.prediction_text}</strong>
+                                </div>
+                                <div class="card-row">
+                                    <span>Estimated Time:</span>
+                                    <strong>${p.predicted_overflow_time}</strong>
+                                </div>
+                            </div>
+                        `;
+                    }).join("");
+                }
+                if (overflowCountEl) overflowCountEl.innerText = `${overflowingBins} Bins Critical`;
+            } catch (e) {
+                console.error("AI Predictions Load Error:", e);
+            }
+        }
+
+        async function loadInboxReports() {
+            try {
+                const res = await fetch("/api/citizen-reports");
+                const data = await res.json();
+                if (!data.success) return;
+
+                const list = document.getElementById("inboxList");
+                if (list) {
+                    if (data.reports.length === 0) {
+                        list.innerHTML = `<div class="timeline-empty">No active citizen reports.</div>`;
+                        return;
+                    }
+
+                    list.innerHTML = data.reports.map(r => {
+                        const isResolved = r.status === "Resolved";
+                        return `
+                            <div class="report-item ${isResolved ? 'resolved' : 'pending'}">
+                                <div class="report-header">
+                                    <strong>${r.issue_type} (Ticket #${r.id})</strong>
+                                    <span>${isResolved ? '✅ Resolved' : '<button class="alert-action-btn" onclick="resolveTicket(' + r.id + ')">Mark Resolved</button>'}</span>
+                                </div>
+                                <div class="report-location">📍 Location: ${r.location_name}</div>
+                                <p>${r.description || 'No additional details provided.'}</p>
+                                <div class="report-footer">
+                                    <small>Reported by ${r.reporter_name} (${r.reporter_contact || 'No contact'}) • ${r.created_at}</small>
+                                </div>
+                            </div>
+                        `;
+                    }).join("");
+                }
+            } catch (e) {
+                console.error("Inbox Load Error:", e);
+            }
+        }
+
+        async function resolveTicket(id) {
+            try {
+                await fetch(`/api/citizen-report/resolve/${id}`, { method: "POST" });
+                loadInboxReports();
+            } catch (e) {
+                console.error("Resolve Error:", e);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", () => {
+            loadAIPredictions();
+            loadInboxReports();
+        });
+    </script>
 </body>
 
 </html>

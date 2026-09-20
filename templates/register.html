@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Register | EcoPulse Smart Waste Platform</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body class="auth-body">
+
+    <div class="auth-card">
+        <div class="brand auth-brand">
+            <div class="brand-icon">♻️</div>
+            <div class="brand-text">
+                <span class="brand-title">EcoPulse IoT</span>
+                <span class="brand-subtitle">Smart Urban Sanitation Portal</span>
+            </div>
+        </div>
+
+        <h2>Create New Account</h2>
+        <p class="auth-subtitle">Register to manage waste operations, drive collection routes, or report bin issues.</p>
+
+        {% if error %}
+        <div class="alert full-alert" style="margin-bottom: 20px;">
+            ⚠️ {{ error }}
+        </div>
+        {% endif %}
+
+        <form method="POST" action="/register">
+            <div class="form-group">
+                <label for="name">Full Name</label>
+                <input type="text" id="name" name="name" required placeholder="John Doe">
+            </div>
+
+            <div class="form-group">
+                <label for="email">Email Address</label>
+                <input type="email" id="email" name="email" required placeholder="john@smartwaste.com">
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" required placeholder="••••••••">
+            </div>
+
+            <div class="form-group">
+                <label for="role">Account Role</label>
+                <select id="role" name="role" required>
+                    <option value="citizen">🏙️ Resident Citizen</option>
+                    <option value="driver">🚚 Collection Truck Driver</option>
+                    <option value="admin">👑 Sanitation Operations Manager</option>
+                </select>
+            </div>
+
+            <button type="submit" class="btn btn-primary-full margin-top-sm">
+                📝 Register Account
+            </button>
+        </form>
+
+        <div class="auth-footer">
+            <span>Already registered?</span>
+            <a href="/login">Sign In Here</a>
+        </div>
+    </div>
+
+</body>
+
+</html>

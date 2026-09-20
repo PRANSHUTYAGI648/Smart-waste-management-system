@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Virtual IoT Hardware Laboratory | EcoPulse</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <div class="brand-icon">🔬</div>
+                <div class="brand-text">
+                    <span class="brand-title">IoT Virtual Hardware Simulator</span>
+                    <span class="brand-subtitle">Ultrasonic Telemetry Mesh Lab</span>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <a href="/dashboard" class="btn btn-outline-sm">📊 Manager View</a>
+                <a href="/logout" class="btn btn-danger-sm">🚪 Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container" style="max-width: 1000px;">
+
+        <div class="hero" style="padding: 20px 0;">
+            <div class="hero-badge">
+                <span>⚡ Hardware Telemetry Emulator</span>
+            </div>
+            <h1>Virtual Ultrasonic Node Simulator</h1>
+            <p>Test sensor fill telemetry payloads, inject hardware anomalies, and monitor real-time server responses without physical microcontrollers.</p>
+        </div>
+
+        <div class="gis-layout">
+            <div class="card-panel">
+                <div class="panel-header">
+                    <h2>🎛️ Virtual Node Telemetry Control</h2>
+                </div>
+
+                <div class="form-group">
+                    <label for="simBinSelect">Target Virtual Bin Node</label>
+                    <select id="simBinSelect" onchange="updateSimForm()">
+                        {% for b in dustbins %}
+                        <option value="{{ b.id }}" data-level="{{ b.waste_level }}" data-battery="{{ b.battery_level or 90 }}" data-location="{{ b.location }}">
+                            Bin #{{ b.id }} - {{ b.location }} (Current: {{ b.waste_level }}%)
+                        </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="form-group margin-top-sm">
+                    <label for="simFillRange">Ultrasonic Waste Fill Level: <strong id="fillValDisplay" class="range-val">50%</strong></label>
+                    <input type="range" id="simFillRange" min="0" max="100" value="50" oninput="updatePayloadPreview()">
+                </div>
+
+                <div class="form-group">
+                    <label for="simBatteryRange">Battery Voltage Health: <strong id="batteryValDisplay" class="range-val">90%</strong></label>
+                    <input type="range" id="simBatteryRange" min="10" max="100" value="90" oninput="updatePayloadPreview()">
+                </div>
+
+                <div class="panel-header margin-top-sm">
+                    <h3>🚨 Anomaly Injection Testing</h3>
+                </div>
+
+                <div class="sim-anomaly-btns">
+                    <button type="button" class="btn btn-danger-sm" onclick="injectAnomaly('overflow')">
+                        🚨 Spike to 95% (Overflow)
+                    </button>
+                    <button type="button" class="btn btn-secondary-sm" onclick="injectAnomaly('low_battery')">
+                        🔋 Low Battery Drop (15%)
+                    </button>
+                    <button type="button" class="btn btn-outline-sm" onclick="injectAnomaly('clean')">
+                        🧹 Reset to 0% (Cleaned)
+                    </button>
+                </div>
+
+                <div class="margin-top">
+                    <button class="btn btn-primary-full" onclick="sendSimPayload()">
+                        📡 Transmit HTTP POST Telemetry Stream
+                    </button>
+                </div>
+            </div>
+
+            <div class="card-panel">
+                <div class="panel-header">
+                    <h2>📟 Live Payload Inspector</h2>
+                </div>
+
+                <div class="code-box">
+                    <span class="code-label">JSON Telemetry Payload (HTTP POST /api/update-dustbin):</span>
+                    <pre id="jsonPreview">{\n  "id": 1,\n  "waste_level": 50,\n  "battery_level": 90\n}</pre>
+                </div>
+
+                <div class="code-box margin-top-sm">
+                    <span class="code-label">Server Response Log:</span>
+                    <pre id="serverLog" style="color: #6ee7b7;">Awaiting transmission...</pre>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="static/script.js"></script>
+    <script>
+        function updateSimForm() {
+            const select = document.getElementById("simBinSelect");
+            const opt = select.options[select.selectedIndex];
+            if (opt) {
+                document.getElementById("simFillRange").value = opt.getAttribute("data-level") || 50;
+                document.getElementById("simBatteryRange").value = opt.getAttribute("data-battery") || 90;
+                updatePayloadPreview();
+            }
+        }
+
+        function updatePayloadPreview() {
+            const binId = document.getElementById("simBinSelect").value;
+            const waste = document.getElementById("simFillRange").value;
+            const battery = document.getElementById("simBatteryRange").value;
+
+            document.getElementById("fillValDisplay").innerText = waste + "%";
+            document.getElementById("batteryValDisplay").innerText = battery + "%";
+
+            const payload = {
+                id: parseInt(binId),
+                waste_level: parseInt(waste),
+                battery_level: parseInt(battery)
+            };
+
+            document.getElementById("jsonPreview").innerText = JSON.stringify(payload, null, 2);
+        }
+
+        function injectAnomaly(type) {
+            if (type === "overflow") {
+                document.getElementById("simFillRange").value = 95;
+            } else if (type === "low_battery") {
+                document.getElementById("simBatteryRange").value = 15;
+            } else if (type === "clean") {
+                document.getElementById("simFillRange").value = 0;
+            }
+            updatePayloadPreview();
+        }
+
+        async function sendSimPayload() {
+            const binId = parseInt(document.getElementById("simBinSelect").value);
+            const waste = parseInt(document.getElementById("simFillRange").value);
+            const battery = parseInt(document.getElementById("simBatteryRange").value);
+
+            try {
+                const logEl = document.getElementById("serverLog");
+                logEl.innerText = "Transmitting HTTP POST payload...";
+
+                const res = await fetch("/api/update-dustbin", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ id: binId, waste_level: waste, battery_level: battery })
+                });
+
+                const data = await res.json();
+                logEl.innerText = `[${new Date().toLocaleTimeString()}] HTTP ${res.status}\n` + JSON.stringify(data, null, 2);
+            } catch (err) {
+                document.getElementById("serverLog").innerText = "Connection error: " + err;
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", updateSimForm);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Driver Dispatch Portal | EcoPulse</title>
+    
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <link rel="stylesheet" href="static/style.css">
+</head>
+
+<body>
+
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <div class="brand-icon">🚚</div>
+                <div class="brand-text">
+                    <span class="brand-title">Driver Mobile Portal</span>
+                    <span class="brand-subtitle">Vehicle #TRK-804 • {{ user.name if user else 'Driver' }}</span>
+                </div>
+            </div>
+
+            <div class="nav-actions">
+                <a href="/dashboard" class="btn btn-outline-sm">📊 Manager View</a>
+                <a href="/logout" class="btn btn-danger-sm">🚪 Logout</a>
+            </div>
+        </div>
+    </header>
+
+    <main class="container" style="max-width: 800px;">
+
+        <div class="status-ticker-bar">
+            <div class="live-badge">
+                <span class="live-dot"></span>
+                <span>Active Route Assigned</span>
+            </div>
+            <div class="ticker-text">
+                📍 Target Fleet Hub: Central Municipal Waste Depot
+            </div>
+        </div>
+
+        <div class="card-panel">
+            <div class="panel-header">
+                <h2>🚚 Assigned Pickup Route Checklist</h2>
+                <span id="routeProgressText" class="badge-dot green">0/0 Stops Completed</span>
+            </div>
+
+            <div class="route-summary-box">
+                <div class="route-stat">
+                    <span class="stat-label">Pending Pickups</span>
+                    <span class="stat-value" id="driverStopsCount">0</span>
+                </div>
+                <div class="route-stat">
+                    <span class="stat-label">Route Distance</span>
+                    <span class="stat-value" id="driverTotalDist">0.0 km</span>
+                </div>
+                <div class="route-stat">
+                    <span class="stat-label">Est. Drive Time</span>
+                    <span class="stat-value" id="driverEstTime">0 mins</span>
+                </div>
+                <div class="route-stat">
+                    <span class="stat-label">Truck Capacity</span>
+                    <span class="stat-value">5,000 L</span>
+                </div>
+            </div>
+
+            <div id="driverChecklist" class="driver-checklist">
+                <div class="timeline-empty">Loading assigned stops...</div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="static/script.js"></script>
+    <script>
+        async function loadDriverRoute() {
+            try {
+                const response = await fetch("/api/route-optimization");
+                const data = await response.json();
+                if (!data.success) return;
+
+                document.getElementById("driverStopsCount").innerText = data.bins_to_collect;
+                document.getElementById("driverTotalDist").innerText = data.total_distance_km + " km";
+                document.getElementById("driverEstTime").innerText = data.estimated_time_mins + " mins";
+
+                const checklist = document.getElementById("driverChecklist");
+                if (data.route.length === 0) {
+                    checklist.innerHTML = `<div class="alert warning-alert" style="background: rgba(16,185,129,0.1); border-color: rgba(16,185,129,0.3); color: #34d399;">🎉 Excellent work! All bin nodes in your sector are clean. No active pickup route needed!</div>`;
+                    return;
+                }
+
+                let html = "";
+                data.route.forEach(bin => {
+                    const isFull = bin.status === "Full";
+                    const navUrl = `https://www.google.com/maps/dir/?api=1&destination=${bin.latitude},${bin.longitude}`;
+
+                    html += `
+                        <div class="driver-stop-card ${isFull ? 'stop-full' : 'stop-warning'}" id="stopCard${bin.id}">
+                            <div class="stop-header">
+                                <div class="stop-badge">Stop #${bin.stop_number}</div>
+                                <div class="stop-title">
+                                    <h3>${bin.location}</h3>
+                                    <span class="bin-type-badge">${bin.bin_type} • ${bin.capacity_liters}L Capacity</span>
+                                </div>
+                                <div class="stop-level">${bin.waste_level}% Fill</div>
+                            </div>
+
+                            <div class="stop-meta">
+                                <span>GPS: ${bin.latitude.toFixed(4)}, ${bin.longitude.toFixed(4)}</span>
+                                <span>Distance: +${bin.distance_from_prev_km} km</span>
+                            </div>
+
+                            <div class="stop-actions">
+                                <a href="${navUrl}" target="_blank" class="btn btn-secondary-sm">
+                                    🗺️ Navigate in GPS
+                                </a>
+                                <button class="btn btn-primary-sm" onclick="markDriverCollected(${bin.id})">
+                                    ✅ Mark Bin Cleaned
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                checklist.innerHTML = html;
+            } catch (e) {
+                console.error("Driver Route Load Error:", e);
+            }
+        }
+
+        async function markDriverCollected(binId) {
+            try {
+                await fetch(`/collect/${binId}`, { method: "POST" });
+                loadDriverRoute();
+            } catch (e) {
+                console.error("Collect Error:", e);
+            }
+        }
+
+        document.addEventListener("DOMContentLoaded", loadDriverRoute);
+    </script>
+</body>
+
+</html>
