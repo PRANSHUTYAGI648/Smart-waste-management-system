@@ -4,99 +4,137 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Waste Management System | IoT Solution</title>
+    <title>EcoPulse | Smart Waste Management System & IoT GIS Solution</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
 
-    <div class="container">
-
-        <!-- Top Navigation -->
-        <div class="top-actions" style="margin-top: 10px;">
-            <div class="live-badge">
-                <span class="live-dot"></span>
-                <span>System Online • Ready for IoT Nodes</span>
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <div class="brand-icon">♻️</div>
+                <div class="brand-text">
+                    <span class="brand-title">EcoPulse IoT</span>
+                    <span class="brand-subtitle">Smart Urban Waste Dispatch</span>
+                </div>
             </div>
-            <div>
-                <a href="/dashboard" class="btn">
+
+            <div class="nav-actions">
+                <div class="live-badge">
+                    <span class="live-dot"></span>
+                    <span>System Online • IoT Mesh Ready</span>
+                </div>
+                <a href="/dashboard" class="btn btn-primary-sm">
                     📊 Open Dashboard
                 </a>
             </div>
         </div>
+    </header>
+
+    <div class="container">
 
         <!-- Hero Section -->
         <div class="hero">
-            <h1>♻️ Smart Waste Management System</h1>
-            <p>An intelligent IoT-based urban monitoring solution detecting garbage bin fill levels in real time using ultrasonic distance telemetry, Flask REST APIs, and automated dispatch alerts.</p>
+            <div class="hero-badge">
+                <span>🌐 Next-Gen Smart City Sanitation</span>
+            </div>
+            <h1>♻️ Smart Waste Management & GIS Dispatching</h1>
+            <p>An intelligent urban monitoring system detecting bin fill levels in real-time via ultrasonic distance telemetry, Flask REST APIs, interactive GIS route optimization, and time-series analytics.</p>
             
             <div class="hero-actions">
-                <a href="/dashboard" class="btn">
-                    🚀 View Live Dashboard
+                <a href="/dashboard" class="btn btn-primary hero-btn">
+                    🚀 View Live Dashboard →
                 </a>
-                <button id="simBtn" onclick="triggerSimulation()" class="btn btn-secondary">
-                    ⚡ Simulate Sensor Telemetry
+                <button id="simBtn" onclick="triggerSimulation()" class="btn btn-secondary hero-btn">
+                    ⚡ Pulse Telemetry Stream
                 </button>
             </div>
         </div>
 
         <!-- Architecture Flow -->
-        <h2>🔄 How The IoT System Works</h2>
+        <div class="section-title-center">
+            <h2>🔄 IoT Telemetry Architecture Workflow</h2>
+            <p>From physical bin sensors to optimized garbage collector vehicle routing</p>
+        </div>
+
         <div class="flow-steps">
             <div class="flow-step">
                 <div class="step-number">1</div>
-                <h3>Ultrasonic Sensing</h3>
-                <p>HC-SR04 / Ultrasonic sensor mounted on bin lid measures distance to waste surface.</p>
+                <h3>Ultrasonic Distance Sensing</h3>
+                <p>HC-SR04 ultrasonic transducer mounted under bin lids measures exact empty space distance to waste surface.</p>
             </div>
             <div class="flow-step">
                 <div class="step-number">2</div>
                 <h3>ESP32 Microcontroller</h3>
-                <p>Processes raw sensor measurements into percentage fill levels and sends HTTP POST payload.</p>
+                <p>Converts distance readings to percentage capacity, monitors battery health, and transmits HTTP POST telemetry.</p>
             </div>
             <div class="flow-step">
                 <div class="step-number">3</div>
-                <h3>Flask Server & DB</h3>
-                <p>Ingests telemetry stream, updates database records, and evaluates threshold alert status.</p>
+                <h3>Flask Server & Time-Series DB</h3>
+                <p>Ingests real-time payloads, logs time-series historical data, and calculates threshold alert states (Normal, Warning, Full).</p>
             </div>
             <div class="flow-step">
                 <div class="step-number">4</div>
-                <h3>Real-Time Dashboard</h3>
-                <p>Visualizes fill levels, alerts operators when bins exceed 80%, and manages collection workflow.</p>
+                <h3>GIS Map & Driver Route Planner</h3>
+                <p>Computes shortest vehicle dispatch route using nearest-neighbor algorithms, visualizing stops on interactive Leaflet maps.</p>
             </div>
         </div>
 
-        <!-- Key Features -->
-        <h2>✨ Core Capabilities</h2>
+        <!-- Core Capabilities Grid -->
+        <div class="section-title-center">
+            <h2>✨ Enterprise System Capabilities</h2>
+        </div>
+
         <div class="features-grid">
             <div class="feature-card">
-                <div class="feature-icon">📊</div>
-                <h3>Real-Time Fill Monitoring</h3>
-                <p>Live percentage bars and status badges (Normal ≤50%, Warning 51-80%, Full >80%) updated continuously.</p>
+                <div class="feature-icon">🗺️</div>
+                <h3>Interactive GIS Mapping</h3>
+                <p>Live OpenStreetMap with color-coded markers (Normal, Warning, Critical) showing exact GPS coordinates and fill percentages.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">🚚</div>
+                <h3>Vehicle Route Optimization</h3>
+                <p>Automated TSP nearest-neighbor algorithm generating optimized stop sequences for collection trucks to minimize fuel and time.</p>
+            </div>
+
+            <div class="feature-card">
+                <div class="feature-icon">📈</div>
+                <h3>Time-Series Analytics</h3>
+                <p>Chart.js graphs tracking fill rates, historical capacity trends, and waste stream breakdown (Organic, Recyclable, E-Waste).</p>
             </div>
 
             <div class="feature-card">
                 <div class="feature-icon">🚨</div>
-                <h3>Instant Capacity Alerts</h3>
-                <p>Automatic high-priority alert cards when bins overflow or reach full capacity, eliminating manual checks.</p>
+                <h3>Audio & Banner Alerts</h3>
+                <p>Instant audio chime and visual alert cards when bins overflow or cross the 80% threshold, facilitating rapid response.</p>
             </div>
 
             <div class="feature-card">
                 <div class="feature-icon">🚮</div>
-                <h3>One-Click Collection</h3>
-                <p>Sanitation workers can mark bins as collected with one click, resetting levels and database records.</p>
+                <h3>One-Click Collection Audit</h3>
+                <p>Sanitation operators can mark bins clean with one click, resetting fill levels and logging collection timestamps.</p>
             </div>
 
             <div class="feature-card">
                 <div class="feature-icon">🔌</div>
                 <h3>RESTful Telemetry API</h3>
-                <p>Fully compliant REST API endpoints (`/api/update-dustbin`, `/api/dustbins`) for easy microcontroller integration.</p>
+                <p>Fully compliant REST API endpoints (`/api/update-dustbin`, `/api/dustbins`, `/api/analytics`) for seamless MCU integration.</p>
             </div>
         </div>
 
-        <br>
-        <div style="margin-bottom: 40px;">
-            <a href="/dashboard" class="btn btn-secondary" style="padding: 14px 30px; font-size: 1.05rem;">
-                Go to Live Dashboard →
+        <div class="cta-banner">
+            <h2>Ready to inspect live urban waste telemetry?</h2>
+            <p>Launch the real-time GIS dashboard to visualize active bin nodes, telemetry streams, and collection dispatch routes.</p>
+            <a href="/dashboard" class="btn btn-primary" style="padding: 14px 32px; font-size: 1.1rem; margin-top: 15px;">
+                Open Live Dashboard →
             </a>
         </div>
 

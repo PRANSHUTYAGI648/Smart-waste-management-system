@@ -2,18 +2,69 @@
     "dustbins": [
         {
             "id": 1,
-            "location": "Main Gate",
-            "waste_level": 85
+            "location": "Main Entrance Gate",
+            "latitude": 28.6139,
+            "longitude": 77.2090,
+            "bin_type": "General Waste",
+            "capacity_liters": 120,
+            "waste_level": 85,
+            "battery_level": 92,
+            "signal_rssi": -65
         },
         {
             "id": 2,
-            "location": "Canteen",
-            "waste_level": 70
+            "location": "Central Canteen",
+            "latitude": 28.6148,
+            "longitude": 77.2099,
+            "bin_type": "Organic Waste",
+            "capacity_liters": 150,
+            "waste_level": 70,
+            "battery_level": 88,
+            "signal_rssi": -70
         },
         {
             "id": 3,
-            "location": "Library",
-            "waste_level": 94
+            "location": "Central Library",
+            "latitude": 28.6155,
+            "longitude": 77.2082,
+            "bin_type": "Recyclable Paper",
+            "capacity_liters": 100,
+            "waste_level": 94,
+            "battery_level": 95,
+            "signal_rssi": -58
+        },
+        {
+            "id": 4,
+            "location": "IT & Engineering Block",
+            "latitude": 28.6162,
+            "longitude": 77.2105,
+            "bin_type": "E-Waste & Batteries",
+            "capacity_liters": 80,
+            "waste_level": 45,
+            "battery_level": 79,
+            "signal_rssi": -72
+        },
+        {
+            "id": 5,
+            "location": "Sports Complex Grounds",
+            "latitude": 28.6128,
+            "longitude": 77.2112,
+            "bin_type": "General Waste",
+            "capacity_liters": 120,
+            "waste_level": 30,
+            "battery_level": 98,
+            "signal_rssi": -62
+        },
+        {
+            "id": 6,
+            "location": "Student Activity Center",
+            "latitude": 28.6142,
+            "longitude": 77.2075,
+            "bin_type": "Recyclable Plastic",
+            "capacity_liters": 100,
+            "waste_level": 88,
+            "battery_level": 84,
+            "signal_rssi": -68
         }
     ]
 }

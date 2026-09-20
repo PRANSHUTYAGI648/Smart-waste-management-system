@@ -4,138 +4,359 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Smart Waste Dashboard | Real-Time IoT Monitoring</title>
+    <title>EcoPulse | Smart Waste Management & GIS Dispatch</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet.js GIS Maps CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+    
+    <!-- Custom Style Sheet -->
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 
 <body>
 
-    <div class="container">
-
-        <div class="top-actions">
-            <div class="live-badge">
-                <span class="live-dot"></span>
-                <span>Live IoT Connection Active</span>
+    <!-- Header Navigation Bar -->
+    <header class="navbar">
+        <div class="nav-container">
+            <div class="brand">
+                <div class="brand-icon">♻️</div>
+                <div class="brand-text">
+                    <span class="brand-title">EcoPulse IoT</span>
+                    <span class="brand-subtitle">Smart Urban Waste Dispatch</span>
+                </div>
             </div>
-            <div style="display: flex; gap: 10px;">
-                <button id="simBtn" onclick="triggerSimulation()" class="btn-secondary">
-                    ⚡ Simulate Telemetry
+
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="switchTab('overview')">📊 Overview</button>
+                <button class="nav-tab" onclick="switchTab('gis-map')">🗺️ GIS Map & Route</button>
+                <button class="nav-tab" onclick="switchTab('analytics')">📈 Time-Series</button>
+                <button class="nav-tab" onclick="switchTab('nodes')">🗑️ Bin Nodes</button>
+            </div>
+
+            <div class="nav-actions">
+                <button id="soundToggleBtn" onclick="toggleSoundAlerts()" class="btn-icon" title="Toggle Alert Sounds">
+                    🔔 <span id="soundStatus">On</span>
                 </button>
-                <a href="/" class="btn btn-outline">
-                    🏠 Home Page
+                <button id="autoStreamBtn" onclick="toggleAutoStream()" class="btn btn-outline-sm">
+                    ▶ Auto Stream
+                </button>
+                <button id="simBtn" onclick="triggerSimulation()" class="btn btn-secondary-sm">
+                    ⚡ Pulse Telemetry
+                </button>
+                <button onclick="openAddNodeModal()" class="btn btn-primary-sm">
+                    ➕ Add Node
+                </button>
+                <a href="/api/export/csv" class="btn btn-outline-sm" title="Export CSV Report">
+                    📥 CSV Report
+                </a>
+                <a href="/" class="btn btn-outline-sm">
+                    🏠 Home
                 </a>
             </div>
         </div>
+    </header>
 
-        <h1>♻️ Smart Waste Management Dashboard</h1>
-        <p>Real-Time Ultrasonic Distance Telemetry & Collection Dispatching</p>
+    <main class="container">
 
-        <!-- Metric Cards -->
-        <div class="cards">
-            <div class="card">
-                <h2>Total Bins</h2>
-                <p id="totalDustbins">{{ dustbins|length }}</p>
+        <!-- Top Status Bar & Ticker -->
+        <div class="status-ticker-bar">
+            <div class="live-badge">
+                <span class="live-dot"></span>
+                <span>System Status: Operational • telemetry active</span>
             </div>
-
-            <div class="card card-normal">
-                <h2>Normal (≤50%)</h2>
-                <p id="normalCount">
-                    {{ dustbins | selectattr("status", "equalto", "Normal") | list | length }}
-                </p>
+            <div class="ticker-text" id="liveTicker">
+                📡 Connecting to IoT Ultrasonic Sensor Mesh...
             </div>
-
-            <div class="card card-warning">
-                <h2>Warning (51-80%)</h2>
-                <p id="warningCount">
-                    {{ dustbins | selectattr("status", "equalto", "Warning") | list | length }}
-                </p>
-            </div>
-
-            <div class="card card-full">
-                <h2>Full (>80%)</h2>
-                <p id="fullCount">
-                    {{ dustbins | selectattr("status", "equalto", "Full") | list | length }}
-                </p>
+            <div id="lastUpdatedTime" class="last-updated">
+                Updated: Just now
             </div>
         </div>
 
-        <!-- Capacity Bar Chart -->
-        <h2>📊 Real-Time Waste Level Monitoring</h2>
-        <div class="chart-container">
-            {% for dustbin in dustbins %}
-            <div class="chart-row">
-                <div class="chart-label">
-                    <span>Dustbin {{ dustbin.id }} - {{ dustbin.location }}</span>
-                    <span class="percentage" id="percentage{{ dustbin.id }}">{{ dustbin.waste_level }}%</span>
+        <!-- Metrics Overview Section -->
+        <section id="tab-overview" class="tab-content active">
+            <div class="metric-grid">
+                <div class="metric-card card-total">
+                    <div class="metric-icon">🗑️</div>
+                    <div class="metric-info">
+                        <h3>Total Bins Monitored</h3>
+                        <p id="totalDustbins">{{ dustbins|length }}</p>
+                    </div>
                 </div>
-                <div class="bar-background">
-                    <div class="bar-fill {% if dustbin.status == 'Normal' %}bar-fill-normal{% elif dustbin.status == 'Warning' %}bar-fill-warning{% else %}bar-fill-full{% endif %}"
-                         id="bar{{ dustbin.id }}" 
-                         style="width: {{ dustbin.waste_level }}%;"></div>
+
+                <div class="metric-card card-normal">
+                    <div class="metric-icon">🟢</div>
+                    <div class="metric-info">
+                        <h3>Normal (≤50%)</h3>
+                        <p id="normalCount">{{ dustbins | selectattr("status", "equalto", "Normal") | list | length }}</p>
+                    </div>
+                </div>
+
+                <div class="metric-card card-warning">
+                    <div class="metric-icon">🟡</div>
+                    <div class="metric-info">
+                        <h3>Warning (51-80%)</h3>
+                        <p id="warningCount">{{ dustbins | selectattr("status", "equalto", "Warning") | list | length }}</p>
+                    </div>
+                </div>
+
+                <div class="metric-card card-full">
+                    <div class="metric-icon">🔴</div>
+                    <div class="metric-info">
+                        <h3>Full Pickups (>80%)</h3>
+                        <p id="fullCount">{{ dustbins | selectattr("status", "equalto", "Full") | list | length }}</p>
+                    </div>
+                </div>
+
+                <div class="metric-card card-route">
+                    <div class="metric-icon">🚚</div>
+                    <div class="metric-info">
+                        <h3>Dispatch Route Distance</h3>
+                        <p id="routeDistance">0.0 km</p>
+                    </div>
+                </div>
+
+                <div class="metric-card card-capacity">
+                    <div class="metric-icon">⚖️</div>
+                    <div class="metric-info">
+                        <h3>Average Fill Capacity</h3>
+                        <p id="avgFillLevel">0%</p>
+                    </div>
                 </div>
             </div>
-            {% endfor %}
-        </div>
 
-        <!-- Dynamic Alerts Container -->
-        <h2>🚨 Live Alerts & Notifications</h2>
-        <div class="alerts" id="alertsContainer">
-            {% for dustbin in dustbins %}
-                {% if dustbin.status == "Full" %}
-                <div class="alert full-alert">
-                    🚨 <strong>Waste Collection Alert!</strong> Dustbin {{ dustbin.id }} - {{ dustbin.location }} is Full ({{ dustbin.waste_level }}%). Immediate pickup required!
-                </div>
-                {% elif dustbin.status == "Warning" %}
-                <div class="alert warning-alert">
-                    ⚠️ <strong>Warning!</strong> Dustbin {{ dustbin.id }} - {{ dustbin.location }} is approaching capacity ({{ dustbin.waste_level }}%).
-                </div>
-                {% endif %}
-            {% endfor %}
-        </div>
-
-        <!-- Dustbin Cards -->
-        <h2>🗑️ Dustbin Nodes & Status</h2>
-        <div id="dustbinContainer">
-            {% for dustbin in dustbins %}
-            <div class="dustbin">
-                <div>
-                    <h3>Dustbin {{ dustbin.id }} - {{ dustbin.location }}</h3>
-                    <p>
-                        Waste Level:
-                        <strong id="wasteLevel{{ dustbin.id }}">{{ dustbin.waste_level }}%</strong>
-                    </p>
-                    <p>
-                        Status:
-                        <strong id="status{{ dustbin.id }}">
-                            {% if dustbin.status == "Normal" %}
-                                🟢 Normal
-                            {% elif dustbin.status == "Warning" %}
-                                🟡 Warning
-                            {% else %}
-                                🔴 Full
-                            {% endif %}
-                        </strong>
-                    </p>
-                    <p>
-                        Collection:
-                        <strong id="collection{{ dustbin.id }}">{{ dustbin.collection_status }}</strong>
-                    </p>
-                </div>
-                <div style="margin-top: 15px;">
-                    {% if dustbin.collection_status == "Pending" %}
-                    <button onclick="collectDustbin({{ dustbin.id }})">
-                        🚮 Mark as Collected
-                    </button>
-                    {% else %}
-                    <span style="color: #34d399; font-weight: 600;">✅ Cleaned</span>
+            <!-- Dynamic Alerts Container -->
+            <div class="section-header">
+                <h2>🚨 High-Priority Capacity Alerts</h2>
+            </div>
+            <div class="alerts-container" id="alertsContainer">
+                {% for dustbin in dustbins %}
+                    {% if dustbin.status == "Full" %}
+                    <div class="alert full-alert">
+                        <span class="alert-icon">🚨</span>
+                        <div class="alert-content">
+                            <strong>Immediate Pickup Required!</strong> Dustbin #{{ dustbin.id }} - {{ dustbin.location }} has reached {{ dustbin.waste_level }}% capacity ({{ dustbin.bin_type }}).
+                        </div>
+                        <button class="alert-action-btn" onclick="collectDustbin({{ dustbin.id }})">Mark Collected</button>
+                    </div>
+                    {% elif dustbin.status == "Warning" %}
+                    <div class="alert warning-alert">
+                        <span class="alert-icon">⚠️</span>
+                        <div class="alert-content">
+                            <strong>Approaching Capacity:</strong> Dustbin #{{ dustbin.id }} - {{ dustbin.location }} is at {{ dustbin.waste_level }}% fill level.
+                        </div>
+                    </div>
                     {% endif %}
+                {% endfor %}
+            </div>
+
+            <!-- Real-Time Capacity Visualizer Bar Chart -->
+            <div class="card-panel margin-top">
+                <div class="panel-header">
+                    <h2>📊 Real-Time Bin Capacity Visualizer</h2>
+                    <div class="panel-actions">
+                        <span class="legend-item"><span class="legend-dot normal"></span> Normal</span>
+                        <span class="legend-item"><span class="legend-dot warning"></span> Warning</span>
+                        <span class="legend-item"><span class="legend-dot full"></span> Critical</span>
+                    </div>
+                </div>
+                <div class="chart-rows-container" id="chartRowsContainer">
+                    {% for dustbin in dustbins %}
+                    <div class="chart-row">
+                        <div class="chart-label">
+                            <span class="bin-title">
+                                <strong>#{{ dustbin.id }}</strong> {{ dustbin.location }}
+                                <span class="bin-type-badge type-{{ dustbin.bin_type | lower | replace(' ', '-') }}">{{ dustbin.bin_type }}</span>
+                            </span>
+                            <span class="percentage" id="percentage{{ dustbin.id }}">{{ dustbin.waste_level }}%</span>
+                        </div>
+                        <div class="bar-background">
+                            <div class="bar-fill {% if dustbin.status == 'Normal' %}bar-fill-normal{% elif dustbin.status == 'Warning' %}bar-fill-warning{% else %}bar-fill-full{% endif %}"
+                                 id="bar{{ dustbin.id }}" 
+                                 style="width: {{ dustbin.waste_level }}%;"></div>
+                        </div>
+                    </div>
+                    {% endfor %}
                 </div>
             </div>
-            {% endfor %}
-        </div>
+        </section>
 
+        <!-- GIS Map & Route Optimization Section -->
+        <section id="tab-gis-map" class="tab-content">
+            <div class="gis-layout">
+                <div class="gis-map-card">
+                    <div class="panel-header">
+                        <h2>🗺️ Live GIS Interactive Map & Bin Telemetry</h2>
+                        <div class="map-legend">
+                            <span class="badge-dot green"></span> Normal (≤50%)
+                            <span class="badge-dot yellow"></span> Warning (51-80%)
+                            <span class="badge-dot red"></span> Full (>80%)
+                            <span class="badge-dot blue"></span> Central Depot
+                        </div>
+                    </div>
+                    <div id="map" class="map-container"></div>
+                </div>
+
+                <div class="gis-dispatch-card">
+                    <div class="panel-header">
+                        <h2>🚚 Driver Dispatch & Optimized Pickup Sequence</h2>
+                    </div>
+
+                    <div class="route-summary-box">
+                        <div class="route-stat">
+                            <span class="stat-label">Stops Needed</span>
+                            <span class="stat-value" id="routeStopsCount">0</span>
+                        </div>
+                        <div class="route-stat">
+                            <span class="stat-label">Total Distance</span>
+                            <span class="stat-value" id="routeTotalDist">0.0 km</span>
+                        </div>
+                        <div class="route-stat">
+                            <span class="stat-label">Est. Duration</span>
+                            <span class="stat-value" id="routeEstTime">0 mins</span>
+                        </div>
+                        <div class="route-stat">
+                            <span class="stat-label">Fuel Saved</span>
+                            <span class="stat-value" id="routeFuelSaved">0 L</span>
+                        </div>
+                    </div>
+
+                    <div class="dispatch-timeline" id="dispatchTimeline">
+                        <div class="timeline-empty">Calculating optimal pickup route...</div>
+                    </div>
+
+                    <div class="dispatch-actions">
+                        <button class="btn btn-primary-full" onclick="printRouteSheet()">
+                            📋 Print Driver Manifest Sheet
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Time-Series Analytics Section -->
+        <section id="tab-analytics" class="tab-content">
+            <div class="analytics-grid">
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <h2>📈 Time-Series Telemetry Trends</h2>
+                        <span class="text-muted">Live 30-reading stream</span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="telemetryTrendChart"></canvas>
+                    </div>
+                </div>
+
+                <div class="card-panel">
+                    <div class="panel-header">
+                        <h2>♻️ Bin Category Distribution</h2>
+                        <span class="text-muted">Waste streams active</span>
+                    </div>
+                    <div class="chart-wrapper doughnut-wrapper">
+                        <canvas id="binTypeDistributionChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bin Nodes Grid Section -->
+        <section id="tab-nodes" class="tab-content">
+            <div class="filter-bar">
+                <div class="search-box">
+                    <span class="search-icon">🔍</span>
+                    <input type="text" id="searchInput" oninput="filterDustbins()" placeholder="Search by location name or bin ID...">
+                </div>
+
+                <div class="filter-group">
+                    <button class="filter-btn active" data-filter="all" onclick="setFilter('status', 'all', this)">All Statuses</button>
+                    <button class="filter-btn" data-filter="Normal" onclick="setFilter('status', 'Normal', this)">🟢 Normal</button>
+                    <button class="filter-btn" data-filter="Warning" onclick="setFilter('status', 'Warning', this)">🟡 Warning</button>
+                    <button class="filter-btn" data-filter="Full" onclick="setFilter('status', 'Full', this)">🔴 Full</button>
+                </div>
+
+                <div class="filter-group">
+                    <select id="typeFilter" onchange="filterDustbins()" class="select-filter">
+                        <option value="all">All Waste Types</option>
+                        <option value="General Waste">General Waste</option>
+                        <option value="Organic Waste">Organic Waste</option>
+                        <option value="Recyclable Paper">Recyclable Paper</option>
+                        <option value="Recyclable Plastic">Recyclable Plastic</option>
+                        <option value="E-Waste & Batteries">E-Waste & Batteries</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="dustbinContainer" class="dustbin-grid">
+                <!-- Dynamically rendered dustbin cards -->
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Add Bin Node Modal -->
+    <div id="addNodeModal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3>➕ Register New IoT Dustbin Node</h3>
+                <button class="modal-close" onclick="closeAddNodeModal()">&times;</button>
+            </div>
+            <form id="addNodeForm" onsubmit="handleAddNodeSubmit(event)">
+                <div class="form-group">
+                    <label for="nodeLocation">Location Name</label>
+                    <input type="text" id="nodeLocation" required placeholder="e.g. Science Block Auditorium">
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nodeType">Waste Category</label>
+                        <select id="nodeType" required>
+                            <option value="General Waste">General Waste</option>
+                            <option value="Organic Waste">Organic Waste</option>
+                            <option value="Recyclable Paper">Recyclable Paper</option>
+                            <option value="Recyclable Plastic">Recyclable Plastic</option>
+                            <option value="E-Waste & Batteries">E-Waste & Batteries</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="nodeCapacity">Capacity (Liters)</label>
+                        <input type="number" id="nodeCapacity" min="50" max="500" value="120" required>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="nodeLat">Latitude Coordinates</label>
+                        <input type="number" step="0.000001" id="nodeLat" value="28.6145" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="nodeLng">Longitude Coordinates</label>
+                        <input type="number" step="0.000001" id="nodeLng" value="77.2095" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="nodeInitialFill">Initial Fill Level (%)</label>
+                    <input type="range" id="nodeInitialFill" min="0" max="100" value="35" oninput="document.getElementById('fillVal').innerText = this.value + '%'">
+                    <span id="fillVal" class="range-val">35%</span>
+                </div>
+
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline" onclick="closeAddNodeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Register IoT Node</button>
+                </div>
+            </form>
+        </div>
     </div>
 
+    <!-- External Scripts: Leaflet.js Maps & Chart.js -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Application Logic -->
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 
